@@ -278,7 +278,7 @@ class Node:
         return result
 
     def show(self, deep=True):
-        """Method to print a single node"""
+        """Method to print a single node and its contents"""
         print(self.name)
         if deep:
             print_dict(self.params, ident=" ")
@@ -286,20 +286,3 @@ class Node:
         if self.subordinates:
             for sub in self.subordinates:
                 print(f"    {sub.name}")
-
-ignores = ["noscript", "/noscript"]
-
-test = seed.build("arquivo.html", below_tag="article", ignore=ignores)
-
-"""
-op = test[0].find_all(tagname="option")
-for no in op:
-    seed._view(no, 0, deep=True)
-
-print(test)
-
-for t in test:
-    seed.view(t)
-"""
-#for t in test:
-#    t.root.show()
