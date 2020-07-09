@@ -8,30 +8,31 @@ from mySoup import seed
 # First you want to build the syntax tree by calling:
 tree_list = seed.build(filename)
 
-# Then, you might want to retrieve objects by accessing specific nodes in the tree.
+# Then, you might want to retrieve objects/variables by accessing specific nodes in the tree.
 
 """
 
 #list of which html tags do not have subtags (will not have a closing </tag>)
-nosub_tags = ["area", "base", "br", "col", "command", "embed", "hr", "iframe" "img", "input", "keygen" "link", "menuitem" "meta", "param", "source", "track", "wbr"]
+nosub_tags = ["area", "base", "br", "col", "command", "embed", "hr", "iframe", "img", "input", "keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr"]
 
 class seed:
     """
     Wraps static methods to be used outside this module
     Also, this class is a Tree factory
     """
-    def __init__(self, arg):
-        self.arg = arg
 
     @staticmethod
-    def build(filename, below_tag=None, below_class=None):
+    def build(filename, below_tag=None, below_class=None, ignore=[]):
         """
-        Method to return a list of trees built from the file passed in as parameter
+        Method to return a list of trees built from the file passed in as parameter.
+        if a string is passed in below_tag, Trees will only be built from below a tag matching the given tagname.
+        if a string is passed in below_class, Trees will only be built from below a tag matching that has the given class property.
+        if a [string] is passed into ignore, nodes with tagnames that match any in the list will not be built.
         """
         trees = []
         with open(filename, "r") as file:
 
-            current_tree = Tree()
+            current_tree = Tree(ignored_nodes=ignore)
             char = file.read(1)
 
             some_text = ""
@@ -40,7 +41,7 @@ class seed:
 
                 if not current_tree.is_open():
                     trees.append(current_tree)
-                    current_tree = Tree()
+                    current_tree = Tree(ignored_nodes=ignore)
 
                 if char == "<":
 
@@ -88,10 +89,10 @@ class seed:
                         current_tree.add_htmltag(tag_name, tag_params)
                     elif below_class:
                         if "class" in tag_params.keys():
-                            if (tag_params["class"] == below_class):
+                            if tag_params["class"] == below_class:
                                 current_tree.add_htmltag(tag_name, tag_params)
                     elif below_tag:
-                        if (tag_name == below_tag) or (current_tree.root is not None):
+                        if tag_name == below_tag:
                             current_tree.add_htmltag(tag_name, tag_params)
                     else: # If no special parameter was specified, this will add the root
                         current_tree.add_htmltag(tag_name, tag_params)
@@ -104,7 +105,10 @@ class seed:
                 char = file.read(1)
 
             if current_tree.is_open():
-                print("Bracket closings have some weird stuff going on")
+                if current_tree.root:
+                    print("Bracket closings have some weird stuff going on")
+                    #current_tree.root.show()
+                    #current_tree.current_node.show()
 
             if current_tree.root: # This condition is to prevent adding an empty tree when the file ends with extra spaces/end of line
                 trees.append(current_tree)
@@ -141,9 +145,10 @@ class Tree:
     This class is a node factory:
     Node objects should always be retrieved through this class
     """
-    def __init__(self):
+    def __init__(self, ignored_nodes=[]):
         self.current_node = None
         self.root = None
+        self.ignored_nodes = ignored_nodes
 
     def new_node(self, tagname, **params):
         """
@@ -174,7 +179,9 @@ class Tree:
         """
         Internal method to parse html node insertion into the tree
         """
-        if tag_name in nosub_tags:
+        if tag_name in self.ignored_nodes:
+            pass
+        elif tag_name in nosub_tags:
             self.new_node(tag_name, **tag_params)
             self.close_node()
         elif tag_name[0] == "/":
@@ -234,11 +241,14 @@ class Node:
         Will dig down in subnodes recursively
         Will return None if no result is found
         """
-        if self.name == search_args.get("name"):
+        if self.name == search_args.get("tagname"):
             return self
-        for key, value in search_args:
-            if self.params[key] == value:
-                return self
+        for key, value in search_args.items():
+            try:
+                if self.params[key] == value:
+                    return self
+            except:
+                pass
         if self.subordinates:
             for sub in self.subordinates:
                 result = sub.find(**search_args)
@@ -253,20 +263,43 @@ class Node:
         Will return an empty list if no result is found
         """
         result = []
-        if self.name == search_args.get("name"):
+        if self.name == search_args.get("tagname"):
             result.append(self)
-        for key, value in search_args:
-            if self.params[key] == value:
-                result.append(self)
+        for key, value in search_args.items():
+            try:
+                if self.params[key] == value:
+                    result.append(self)
+            except:
+                pass
         if self.subordinates:
             for sub in self.subordinates:
                 sub_result = sub.find_all(**search_args)
                 result.extend(sub_result)
         return result
 
-test = seed.build("arquivo.html", below_class="controls")
+    def show(self, deep=True):
+        """Method to print a single node"""
+        print(self.name)
+        if deep:
+            print_dict(self.params, ident=" ")
+
+        if self.subordinates:
+            for sub in self.subordinates:
+                print(f"    {sub.name}")
+
+ignores = ["noscript", "/noscript"]
+
+test = seed.build("arquivo.html", below_tag="article", ignore=ignores)
+
+"""
+op = test[0].find_all(tagname="option")
+for no in op:
+    seed._view(no, 0, deep=True)
 
 print(test)
 
 for t in test:
-    seed.view(t, deep=True)
+    seed.view(t)
+"""
+#for t in test:
+#    t.root.show()
